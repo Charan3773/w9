@@ -1,8 +1,14 @@
 pipeline {
     agent any
 
+    environment {
+        DOCKER_HUB_CREDENTIALS = 'dockerhub'  // Jenkins credentials ID
+        IMAGE_NAME = 'charan3773/w9-app'       // change as required
+        IMAGE_TAG = 'latest'
+    }
+
     stages {
-        stage('Clone Repo') {
+        stage('Checkout Source') {
             steps {
                 checkout scm
             }
@@ -11,20 +17,31 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    dockerImage = docker.build("charan3773/kube1:latest")
+                    sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
                 }
             }
         }
 
-        stage('Push to DockerHub') {
+        stage('Login to DockerHub') {
             steps {
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub') {
-                        dockerImage.push()
+                    withCredentials([usernamePassword(credentialsId: "${DOCKER_HUB_CREDENTIALS}", usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
+                        sh "docker login -u ${DH_USER} -p ${DH_PASS}"
                     }
                 }
             }
         }
+
+        stage('Push Image to DockerHub') {
+            steps {
+                sh "docker push ${IMAGE_NAME}:${IMAGE_TAG}"
+            }
+        }
+    }
+
+    post {
+        always {
+            sh "docker logout"
+        }
     }
 }
-
